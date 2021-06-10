@@ -9,7 +9,7 @@ class Base(db.Model):
 class User(Base):
     __tablename__ = "users"
     username = db.Column(db.String(64))
-    messages = db.relationship("posts", backref="users", lazy=True)
+    posts = db.relationship("Post", backref="users", lazy=True)
 
 
 class Channel(Base):
@@ -18,7 +18,8 @@ class Channel(Base):
     admin_user = db.Column(db.Integer)
     tg_channel_id = db.Column(db.Integer)
     tg_post_channel_id = db.Column(db.Integer)
-    post_messages = db.relationship("posts", backref="channels", lazy=True)
+    post_messages = db.relationship("Post", backref="channels", lazy=True)
+
 
 class Post(Base):
     __tablename__ = "posts"
