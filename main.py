@@ -1,4 +1,5 @@
 import requests
+import json
 
 from app.models import *
 from app import flask_app
@@ -18,23 +19,7 @@ def receive():
     user_id = request.json["message"]["from"]["id"]
     username = request.json["message"]["from"]["username"]
 
-    # by primary_key
-    user = User.query.get(int(user_id))
-
-    # by any field
-    # user = User.query.filter(User.id == int(user_id)).first()
-    # user = User.query.filter(User.id == int(user_id)).all()
-    # user = User.query.filter(User.id == int(user_id)).last()
-
-    if user is None:
-        send_message("Who is?", user_id)
-        user = User(id=int(user_id), username=username)
-        db.session.add(user)
-        db.session.commit()
-    else:
-        send_message(f"Hello {user.username}", user.id)
-
-    send_message("hello", user_id)
+    send_message("тык", user_id)
     return "OK"
 
 
@@ -43,8 +28,8 @@ def send_message(message, user_id):
 
     token = BOT_TOKEN
     url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
-    data = {"chat_id": user_id, "text": message}
+    data = {"chat_id": user_id, "text": message, "reply_markup": json.dumps({ "keyboard": [ [ {"text": "Кнопка 1"} ] ] }) }
     requests.post(url, data=data)
-
+    pass
 
 flask_app.run()
