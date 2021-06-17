@@ -7,5 +7,5 @@ class Config(object):
 
 TELEGRAM_URL = "https://api.telegram.org"
 BOT_TOKEN = os.getenv('BOT_TOKEN', '1847977944:AAGw_tfQwOCV6NlK2rzT17YGKwHHE6AN-Xo')
-WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://3f9aab80c6fa.ngrok.io')
+WEBHOOK_URL = os.getenv('WEBHOOK_URL', 'https://62d67e8c6035.ngrok.io')
 
