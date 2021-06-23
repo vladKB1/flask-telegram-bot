@@ -14,7 +14,7 @@ url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/setWebHook"
 requests.post(url, data)
 
 
-def send_message(message, user_id):
+def send_short_msg(message, user_id):
     method = "sendMessage"
     url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
     data = {"chat_id": user_id, "text": message}
@@ -57,6 +57,24 @@ def receive():
             db.session.commit()
             send_message(START_MSG, user_id, json.dumps(START_MENU))
 
+        if user.state == "search":
+            if check_search(text):
+                user.state = "search_done"
+                db.session.commit()
+
+                if not check_favorite(text):
+                    send_message(AFTER_SEARCH_NOT_FAVORITES_MSG, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
+                else:
+                    send_message(AFTER_SEARCH_SEND_MESSAGE_MSG, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
+            else:
+                send_short_msg(SEARCH_FAILED_MSG, user_id)
+                send_message(SEARCH_MSG, user_id, json.dumps(SEARCH_MENU))
+        elif user.state.find("after_search_send_message") != -1: #only text messages. Need to upgrade for all types of content.
+            send_message_to_channel(text)
+
+            user.state = "message_sent"
+            db.session.commit()
+            send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
     return ""
 
 
@@ -69,6 +87,8 @@ def buttons_processing():
 
     if rdata == "back":
         rdata = RETURN_BACK[user.state]
+    elif rdata == "one_more_post" or rdata == "return_to_start":
+        rdata = RETURN_BACK[rdata]
 
     user.state = rdata
     db.session.commit()
@@ -78,17 +98,41 @@ def buttons_processing():
     elif rdata == "suggest_post":
         edit_message(SUGGEST_POST_MSG, message_id, user_id, json.dumps(SUGGEST_POST_MENU))
     elif rdata == "my_channels":
-        edit_message(SUGGEST_POST_MSG, message_id, user_id, json.dumps(SUGGEST_POST_MENU))
+        edit_message(MY_CHANNELS_MSG, message_id, user_id, json.dumps(MY_CHANNELS_MENU))
+    elif rdata == "sent_messages":
+        edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
 
     # press suggest_post
-    elif rdata == "find":
-        find_channels(user_id)
-        edit_message(SUGGEST_POST_MSG, message_id, user_id, json.dumps(SUGGEST_POST_MENU))
+    elif rdata == "search":
+        edit_message(SEARCH_MSG, message_id, user_id, json.dumps(SEARCH_MENU))
     elif rdata == "favorites":
         pass
 
-    # my_channels
-    # elif rd
+    # press back in after_search_not_favorites
+    elif rdata == "after_search_not_favorites":
+        edit_message(AFTER_SEARCH_NOT_FAVORITES_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
 
+    # press add_favorites
+    elif rdata == "add_favorites":
+        # add_favorites()
+        edit_message(ADD_FAVORITES_MSG, message_id, user_id, json.dumps(ADD_FAVORITES_MENU))
+
+    # press after_search_send_message
+    elif rdata.find("after_search_send_message") != -1:
+        edit_message(AFTER_SEARCH_SEND_MESSAGE_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
+
+def check_search(channel_name):
+    channel = Channel.query.filter(Channel.name == channel_name).first()
+    if channel is None:
+        return False
+    else:
+        return True
+
+def check_favorite(channel_name):
+    # get info from UserFavoritesRelation
+    return False
+
+def send_message_to_channel(message):
+    pass
 
 flask_app.run()

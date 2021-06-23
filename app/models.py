@@ -18,7 +18,6 @@ class Channel(Base):
     name = db.Column(db.String(64))
     admin_user = db.Column(db.Integer)
     tg_channel_id = db.Column(db.Integer)
-    tg_post_channel_id = db.Column(db.Integer)
     post_messages = db.relationship("Post", backref="channels", lazy=True)
 
 
