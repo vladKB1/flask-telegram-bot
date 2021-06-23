@@ -76,13 +76,16 @@ SENT_MSGS_MENU = {"inline_keyboard": [
 
 RETURN_BACK = {
     "suggest_post": "/start", "my_channels": "/start", "sent_messages": "/start",
+
     "search": "suggest_post",
-    "search_done": "search", "add_favorites": "search",
-    "after_search_send_message_1": "after_search_not_favorites", "after_search_send_message_2": "add_favorites",
+
+    "after_search_not_favorites": "search", "add_favorites": "search",
+
+    "after_search_send_message_1": "after_search_not_favorites", "after_search_send_message_2": "search",
     "after_search_send_message_3": "suggest_post",
 
-    "connect_channel": "my_channels",
+    "one_more_post": "after_search_send_message_3", "return_to_start": "/start",
 
-    "one_more_post": "after_search_send_message_3", "return_to_start": "/start"
+    "connect_channel": "my_channels"
 
 }

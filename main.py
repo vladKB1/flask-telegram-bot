@@ -58,7 +58,6 @@ def receive():
         buttons_processing()
         return ""
 
-
     user_id = int(request.json["message"]["from"]["id"])
     username = request.json["message"]["from"]["username"]
     user = User.query.get(user_id)
@@ -75,10 +74,11 @@ def receive():
             user.state = "/start"
             db.session.commit()
             send_message(START_MSG, user_id, json.dumps(START_MENU))
+            return ""
 
-        elif user.state == "search":
+
+        if user.state == "search":
             if check_search(text):
-                user.state = "search_done"  ##
                 user.state_data = text
                 db.session.commit()
 
@@ -87,48 +87,90 @@ def receive():
                     db.session.commit()
                     send_message(AFTER_SEARCH_NOT_FAVORITES_MSG, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
                 else:
-                    user.state = "after_search_send_message"
+                    user.state = "after_search_send_message_2"
                     db.session.commit()
                     send_message(AFTER_SEARCH_SEND_MESSAGE_MSG, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
             else:
                 send_short_msg(SEARCH_FAILED_MSG, user_id)
                 send_message(SEARCH_MSG, user_id, json.dumps(SEARCH_MENU))
-        elif user.state.find("after_search_send_message") != -1:  # only text messages. Need to upgrade for all types of content.
-            send_message_to_channel(text)
 
-            user.state = "message_sent"  ##
-            db.session.commit()
+        elif user.state.find("after_search_send_message") != -1:
+            # only text messages. Need to upgrade for all types of content.
+            send_post_to_channel(user_id, get_channel_id(user.state_data), text)
             send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
 
         elif user.state == "connect_channel":
             channel = Channel.query.filter(Channel.name == text).first()
             
             if channel is None:
+                get_chat(text)
                 response = json.loads(get_chat(text).content)
-    
+
                 if response["ok"]:
                     channel_id = response["result"]["id"]
                     name = response["result"]["username"]
-    
+
                     response = json.loads(get_chat_admin(channel_id).content)
                     if response["ok"]:
                         for member in response["result"]:
                             if member["status"] == "creator":
-                                admin_user = member["user"]["id"]
+                                admin_user = int(member["user"]["id"])
                                 break
-    
+
                         if admin_user == user_id:
-                            #add check on if bot can make change
-                            channel = Channel(id=channel_id, name=name, admin_user=admin_user)
+                            # add check on if bot can make change
+                            channel = Channel(channel_id=channel_id, name="@"+name, admin_user=admin_user)
                             db.session.add(channel)
                             db.session.commit()
-                            
+
             #delete_message()
             user.state = "my_channels"
             menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy())
             send_message(MY_CHANNELS_MSG, user_id, json.dumps(menu))
 
     return ""
+
+
+def get_channel_id(channel_name):
+    return Channel.query.filter(Channel.name == channel_name).first().channel_id
+
+
+def add_favorites(user_id, channel_name):
+    channel_id = get_channel_id(channel_name)
+    userFavoritesRelation = UserFavoritesRelation(user_id=user_id, channel_id=channel_id)
+    db.session.add(userFavoritesRelation)
+    db.session.commit()
+
+
+def check_search(channel_name):
+    channel = Channel.query.filter(Channel.name == channel_name).first()
+    if channel is None:
+        return False
+    else:
+        return True
+
+
+def check_favorite(user_id, channel_id):
+    userFavoritesRelation = UserFavoritesRelation.query.filter(
+        UserFavoritesRelation.user_id == user_id and UserFavoritesRelation.channel_id == channel_id).first()
+
+    if userFavoritesRelation is None:
+        return False
+    else:
+        return True
+
+
+def send_post_to_channel(user_id, channel_id, text):
+    post = Post(user_id=user_id, channel_id=channel_id, text=text)
+    db.session.add(post)
+    db.session.commit()
+
+
+def update_channels_menu(user_id, menu):
+    channels = Channel.query.filter(Channel.admin_user == user_id).all()
+    for channel in channels:
+        menu.append([{"text": channel.name, "callback_data": "channel_chose|" + str(channel.id)}])
+    return {"inline_keyboard": menu}
 
 
 def buttons_processing():
@@ -177,43 +219,6 @@ def buttons_processing():
     # press connect_channel
     elif rdata == "connect_channel":
         edit_message(CONNECT_CHANNEL_MSG, message_id, user_id, json.dumps(CONNECT_CHANNEL_MENU))
-
-
-
-def add_favorites(user_id, channel_name):
-    channel_id = Channel.query.filter(Channel.name == channel_name).first().id
-    userFavoritesRelation = UserFavoritesRelation(user_id=user_id, channel_id=channel_id)
-    db.session.add(userFavoritesRelation)
-    db.session.commit()
-
-
-def check_search(channel_name):
-    channel = Channel.query.filter(Channel.name == channel_name).first()
-    if channel is None:
-        return False
-    else:
-        return True
-
-
-def check_favorite(user_id, channel_id):
-    userFavoritesRelation = UserFavoritesRelation.query.filter(
-        UserFavoritesRelation.user_id == user_id and UserFavoritesRelation.channel_id == channel_id).first()
-
-    if userFavoritesRelation is None:
-        return False
-    else:
-        return True
-
-
-def send_message_to_channel(message):
-    pass
-
-
-def update_channels_menu(user_id, menu):
-    channels = Channel.query.filter(Channel.admin_user == user_id).all()
-    for channel in channels:
-        menu.append([{"text": channel.name, "callback_data": "channel_chose|" + str(channel.id)}])
-    return {"inline_keyboard": menu}
 
 
 flask_app.run()
