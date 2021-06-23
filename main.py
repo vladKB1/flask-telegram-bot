@@ -59,20 +59,25 @@ def receive():
 
         if user.state == "search":
             if check_search(text):
-                user.state = "search_done"
+                user.state = "search_done"  ##
+                user.state_data = text
                 db.session.commit()
 
-                if not check_favorite(text):
+                if not check_favorite(user_id, text):
+                    user.state = "after_search_not_favorites"
+                    db.session.commit()
                     send_message(AFTER_SEARCH_NOT_FAVORITES_MSG, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
                 else:
+                    user.state = "after_search_send_message"
+                    db.session.commit()
                     send_message(AFTER_SEARCH_SEND_MESSAGE_MSG, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
             else:
                 send_short_msg(SEARCH_FAILED_MSG, user_id)
                 send_message(SEARCH_MSG, user_id, json.dumps(SEARCH_MENU))
-        elif user.state.find("after_search_send_message") != -1: #only text messages. Need to upgrade for all types of content.
+        elif user.state.find("after_search_send_message") != -1:  # only text messages. Need to upgrade for all types of content.
             send_message_to_channel(text)
 
-            user.state = "message_sent"
+            user.state = "message_sent"  ##
             db.session.commit()
             send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
     return ""
@@ -108,18 +113,26 @@ def buttons_processing():
     elif rdata == "favorites":
         pass
 
-    # press back in after_search_not_favorites
+    # press '<< back' after common button for suggest post & channel not favorites
     elif rdata == "after_search_not_favorites":
         edit_message(AFTER_SEARCH_NOT_FAVORITES_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
 
     # press add_favorites
     elif rdata == "add_favorites":
-        # add_favorites()
+        add_favorites(user_id, user.state_data)
         edit_message(ADD_FAVORITES_MSG, message_id, user_id, json.dumps(ADD_FAVORITES_MENU))
 
-    # press after_search_send_message
+    # common button for suggest post
     elif rdata.find("after_search_send_message") != -1:
         edit_message(AFTER_SEARCH_SEND_MESSAGE_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
+
+
+def add_favorites(user_id, channel_name):
+    channel_id = Channel.query.filter(Channel.name == channel_name).first().id
+    userFavoritesRelation = UserFavoritesRelation(user_id=user_id, channel_id=channel_id)
+    db.session.add(userFavoritesRelation)
+    db.session.commit()
+
 
 def check_search(channel_name):
     channel = Channel.query.filter(Channel.name == channel_name).first()
@@ -128,11 +141,17 @@ def check_search(channel_name):
     else:
         return True
 
-def check_favorite(channel_name):
-    # get info from UserFavoritesRelation
-    return False
+
+def check_favorite(user_id, channel_id):
+    userFavoritesRelation = UserFavoritesRelation.query.filter(user_id == user_id and channel_id == channel_id).first()
+    if userFavoritesRelation is None:
+        return False
+    else:
+        return True
+
 
 def send_message_to_channel(message):
     pass
+
 
 flask_app.run()

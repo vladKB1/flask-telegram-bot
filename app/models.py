@@ -10,6 +10,7 @@ class User(Base):
     __tablename__ = "users"
     username = db.Column(db.String(64))
     state = db.Column(db.String(64))
+    state_data = db.Column(db.String(64))
     posts = db.relationship("Post", backref="users", lazy=True)
 
 
