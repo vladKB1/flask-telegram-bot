@@ -35,11 +35,29 @@ def edit_message(message, message_id, user_id, reply_markup):
     requests.post(url, data=data)
 
 
+#def delete_message():
+
+
+def get_chat(chat_id):
+    method = "getChat"
+    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
+    data = {"chat_id": chat_id}
+    return requests.post(url, data=data)
+
+
+def get_chat_admin(chat_id):
+    method = "getChatAdministrators"
+    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
+    data = {"chat_id": chat_id}
+    return requests.post(url, data=data)
+
+
 @flask_app.route("/", methods=["POST"])
 def receive():
     if "callback_query" in request.json:
         buttons_processing()
         return ""
+
 
     user_id = int(request.json["message"]["from"]["id"])
     username = request.json["message"]["from"]["username"]
@@ -47,6 +65,7 @@ def receive():
 
     if "text" in request.json["message"]:
         text = request.json["message"]["text"]
+
         if text == "/start":
             if user is None:
                 user = User(id=user_id, username=username)
@@ -57,7 +76,7 @@ def receive():
             db.session.commit()
             send_message(START_MSG, user_id, json.dumps(START_MENU))
 
-        if user.state == "search":
+        elif user.state == "search":
             if check_search(text):
                 user.state = "search_done"  ##
                 user.state_data = text
@@ -80,6 +99,35 @@ def receive():
             user.state = "message_sent"  ##
             db.session.commit()
             send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
+
+        elif user.state == "connect_channel":
+            channel = Channel.query.filter(Channel.name == text).first()
+            
+            if channel is None:
+                response = json.loads(get_chat(text).content)
+    
+                if response["ok"]:
+                    channel_id = response["result"]["id"]
+                    name = response["result"]["username"]
+    
+                    response = json.loads(get_chat_admin(channel_id).content)
+                    if response["ok"]:
+                        for member in response["result"]:
+                            if member["status"] == "creator":
+                                admin_user = member["user"]["id"]
+                                break
+    
+                        if admin_user == user_id:
+                            #add check on if bot can make change
+                            channel = Channel(id=channel_id, name=name, admin_user=admin_user)
+                            db.session.add(channel)
+                            db.session.commit()
+                            
+            #delete_message()
+            user.state = "my_channels"
+            menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy())
+            send_message(MY_CHANNELS_MSG, user_id, json.dumps(menu))
+
     return ""
 
 
@@ -102,10 +150,8 @@ def buttons_processing():
         edit_message(START_MSG, message_id, user_id, json.dumps(START_MENU))
     elif rdata == "suggest_post":
         edit_message(SUGGEST_POST_MSG, message_id, user_id, json.dumps(SUGGEST_POST_MENU))
-    elif rdata == "my_channels":
-        edit_message(MY_CHANNELS_MSG, message_id, user_id, json.dumps(MY_CHANNELS_MENU))
-    elif rdata == "sent_messages":
-        edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
+    #elif rdata == "sent_messages":
+    #    edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
 
     # press suggest_post
     elif rdata == "search":
@@ -116,15 +162,22 @@ def buttons_processing():
     # press '<< back' after common button for suggest post & channel not favorites
     elif rdata == "after_search_not_favorites":
         edit_message(AFTER_SEARCH_NOT_FAVORITES_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
-
     # press add_favorites
     elif rdata == "add_favorites":
         add_favorites(user_id, user.state_data)
         edit_message(ADD_FAVORITES_MSG, message_id, user_id, json.dumps(ADD_FAVORITES_MENU))
-
     # common button for suggest post
     elif rdata.find("after_search_send_message") != -1:
         edit_message(AFTER_SEARCH_SEND_MESSAGE_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
+
+    # press my_channels
+    elif rdata == "my_channels":
+        menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy())
+        edit_message(MY_CHANNELS_MSG, message_id, user_id, json.dumps(menu))
+    # press connect_channel
+    elif rdata == "connect_channel":
+        edit_message(CONNECT_CHANNEL_MSG, message_id, user_id, json.dumps(CONNECT_CHANNEL_MENU))
+
 
 
 def add_favorites(user_id, channel_name):
@@ -143,7 +196,9 @@ def check_search(channel_name):
 
 
 def check_favorite(user_id, channel_id):
-    userFavoritesRelation = UserFavoritesRelation.query.filter(user_id == user_id and channel_id == channel_id).first()
+    userFavoritesRelation = UserFavoritesRelation.query.filter(
+        UserFavoritesRelation.user_id == user_id and UserFavoritesRelation.channel_id == channel_id).first()
+
     if userFavoritesRelation is None:
         return False
     else:
@@ -152,6 +207,13 @@ def check_favorite(user_id, channel_id):
 
 def send_message_to_channel(message):
     pass
+
+
+def update_channels_menu(user_id, menu):
+    channels = Channel.query.filter(Channel.admin_user == user_id).all()
+    for channel in channels:
+        menu.append([{"text": channel.name, "callback_data": "channel_chose|" + str(channel.id)}])
+    return {"inline_keyboard": menu}
 
 
 flask_app.run()

@@ -46,13 +46,22 @@ MESSAGE_SENT_MENU = {"inline_keyboard": [
     [{"text": "Ещё один пост", "callback_data": "one_more_post"},
      {"text": "Назад в главное меню", "callback_data": "return_to_start"}]]}
 
-
 # my_channels
-MY_CHANNELS_MSG = "my channels msg"
-MY_CHANNELS_MENU = {"inline_keyboard": [
-    [{"text": "Подключить канал", "callback_data": "add_channel"},
-     {"text": "Выбрать канал", "callback_data": "choose_channel"}],
+MY_CHANNELS_MSG = "Здесь вы можете подключить новый канал к боту, либо выбрать уже подключенный."
+MY_CHANNELS_MENU = [[{"text": "➕ Добавить канал", "callback_data": "connect_channel"},
+                     {"text": "🔄 Обновить", "callback_data": "my_channels"}],
+                    [{"text": "<< Назад", "callback_data": "back"}]]
+
+# connect_channel
+CONNECT_CHANNEL_MSG = "Для того чтобы добавить канал необходимо:\n" \
+                      "1. Добавить бота в канал как администратора\n" \
+                      "2. Убедиться в том, что у бота есть права для публикации постов\n" \
+                      "3. Прислать название канала через @\n" \
+                      "Если все шаги были выполнены успешно, то канал отобразится в списке каналов."
+CONNECT_CHANNEL_MENU = {"inline_keyboard": [
     [{"text": "<< Назад", "callback_data": "back"}]]}
+
+
 
 # sent_messages
 SENT_MSGS_MSG = "Выберите кол-во последних сообщений для просмотра:"
@@ -65,14 +74,15 @@ SENT_MSGS_MENU = {"inline_keyboard": [
 
 
 
-
-
 RETURN_BACK = {
     "suggest_post": "/start", "my_channels": "/start", "sent_messages": "/start",
     "search": "suggest_post",
     "search_done": "search", "add_favorites": "search",
-    "after_search_send_message_1": "after_search_not_favorites", "after_search_send_message_2":  "add_favorites",
+    "after_search_send_message_1": "after_search_not_favorites", "after_search_send_message_2": "add_favorites",
     "after_search_send_message_3": "suggest_post",
 
+    "connect_channel": "my_channels",
+
     "one_more_post": "after_search_send_message_3", "return_to_start": "/start"
+
 }
