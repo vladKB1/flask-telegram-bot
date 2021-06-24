@@ -46,6 +46,16 @@ MESSAGE_SENT_MENU = {"inline_keyboard": [
     [{"text": "Ещё один пост", "callback_data": "one_more_post"},
      {"text": "Назад в главное меню", "callback_data": "return_to_start"}]]}
 
+# favorites
+MY_FAVORITES_MSG = "Ваши каналы, добавленные в избранное: "
+MY_FAVORITES_MENU = [[{"text": "➖ Удалить канал", "callback_data": "delete_from_favorites"},
+                     {"text": "<< Назад", "callback_data": "back"}]]
+
+#delete_from_favorites
+DELETE_FROM_FAVORITES_MSG = "Нажмите на канал, который хотите удалить из избранного:"
+DELETE_FROM_FAVORITES_MENU = [[{"text": "<< Назад", "callback_data": "back"}]]
+AFTER_DELETE_CHANNEL_FROM_FAVORITES_MSG = "Канал успешно удалён из избранного!"
+
 # my_channels
 MY_CHANNELS_MSG = "Здесь вы можете подключить новый канал к боту, либо выбрать уже подключенный."
 MY_CHANNELS_MENU = [[{"text": "➕ Добавить канал", "callback_data": "connect_channel"},
@@ -77,14 +87,16 @@ SENT_MSGS_MENU = {"inline_keyboard": [
 RETURN_BACK = {
     "suggest_post": "/start", "my_channels": "/start", "sent_messages": "/start",
 
-    "search": "suggest_post",
+    "search": "suggest_post", "favorites": "suggest_post",
+
+    "delete_from_favorites": "favorites",
 
     "after_search_not_favorites": "search", "add_favorites": "search",
-
     "after_search_send_message_1": "after_search_not_favorites", "after_search_send_message_2": "search",
-    "after_search_send_message_3": "suggest_post",
-
+    "after_search_send_message_3": "suggest_post", "after_search_send_message": "favorites",
     "one_more_post": "after_search_send_message_3", "return_to_start": "/start",
+
+
 
     "connect_channel": "my_channels"
 

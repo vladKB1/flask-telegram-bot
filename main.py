@@ -133,12 +133,20 @@ def receive():
 
 def get_channel_id(channel_name):
     return Channel.query.filter(Channel.name == channel_name).first().channel_id
+def get_channel_name(channel_id):
+    return Channel.query.filter(Channel.channel_id == channel_id).first().name
 
 
 def add_favorites(user_id, channel_name):
     channel_id = get_channel_id(channel_name)
     userFavoritesRelation = UserFavoritesRelation(user_id=user_id, channel_id=channel_id)
     db.session.add(userFavoritesRelation)
+    db.session.commit()
+
+
+def delete_favorites(user_id, channel_id):
+    UserFavoritesRelation.query.filter(UserFavoritesRelation.user_id == user_id,
+                                       UserFavoritesRelation.channel_id == channel_id).delete()
     db.session.commit()
 
 
@@ -160,17 +168,29 @@ def check_favorite(user_id, channel_id):
         return True
 
 
+
+
 def send_post_to_channel(user_id, channel_id, text):
     post = Post(user_id=user_id, channel_id=channel_id, text=text)
     db.session.add(post)
     db.session.commit()
 
 
+#update menus
+def update_favorites_menu(user_id, menu, callback_text):
+    channels = UserFavoritesRelation.query.filter(UserFavoritesRelation.user_id == user_id).all()
+    for channel in channels:
+        menu.append([{"text": get_channel_name(channel.channel_id),
+                      "callback_data": callback_text + channel.channel_id}])
+    return {"inline_keyboard": menu}
+
+
 def update_channels_menu(user_id, menu):
     channels = Channel.query.filter(Channel.admin_user == user_id).all()
     for channel in channels:
-        menu.append([{"text": channel.name, "callback_data": "channel_chose|" + str(channel.id)}])
+        menu.append([{"text": channel.name, "callback_data": "channel_chose|" + channel.channel_id}])
     return {"inline_keyboard": menu}
+
 
 
 def buttons_processing():
@@ -192,15 +212,10 @@ def buttons_processing():
         edit_message(START_MSG, message_id, user_id, json.dumps(START_MENU))
     elif rdata == "suggest_post":
         edit_message(SUGGEST_POST_MSG, message_id, user_id, json.dumps(SUGGEST_POST_MENU))
-    #elif rdata == "sent_messages":
-    #    edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
 
-    # press suggest_post
+    #press search
     elif rdata == "search":
         edit_message(SEARCH_MSG, message_id, user_id, json.dumps(SEARCH_MENU))
-    elif rdata == "favorites":
-        pass
-
     # press '<< back' after common button for suggest post & channel not favorites
     elif rdata == "after_search_not_favorites":
         edit_message(AFTER_SEARCH_NOT_FAVORITES_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
@@ -212,6 +227,29 @@ def buttons_processing():
     elif rdata.find("after_search_send_message") != -1:
         edit_message(AFTER_SEARCH_SEND_MESSAGE_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
 
+    # press favorites
+    elif rdata == "favorites":
+        menu = update_favorites_menu(user_id, MY_FAVORITES_MENU.copy(), "channel_chose|")
+        edit_message(MY_FAVORITES_MSG, message_id, user_id, json.dumps(menu))
+    # press delete_from_favorites
+    elif rdata == "delete_from_favorites":
+        menu = update_favorites_menu(user_id, DELETE_FROM_FAVORITES_MENU.copy(), "channel_delete|")
+        edit_message(DELETE_FROM_FAVORITES_MSG, message_id, user_id, json.dumps(menu))
+    # chose channel from favorites
+    elif rdata.find("channel_chose") != -1:
+        channel_name = get_channel_name(rdata.split("|")[1])
+        user.state = "after_search_send_message"
+        user.state_data = channel_name
+        db.session.commit()
+        edit_message(AFTER_SEARCH_SEND_MESSAGE_MSG, message_id, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
+    # delete channel from favorites
+    elif rdata.find("channel_delete") != -1:
+        channel_id = rdata.split("|")[1]
+        delete_favorites(user_id, channel_id)
+        menu = update_favorites_menu(user_id, MY_FAVORITES_MENU.copy(), "channel_chose|")
+        edit_message(AFTER_DELETE_CHANNEL_FROM_FAVORITES_MSG, message_id, user_id, json.dumps(menu))
+
+
     # press my_channels
     elif rdata == "my_channels":
         menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy())
@@ -220,5 +258,7 @@ def buttons_processing():
     elif rdata == "connect_channel":
         edit_message(CONNECT_CHANNEL_MSG, message_id, user_id, json.dumps(CONNECT_CHANNEL_MENU))
 
+    # elif rdata == "sent_messages":
+    #    edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
 
 flask_app.run()
