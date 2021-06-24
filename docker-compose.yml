@@ -1,0 +1,40 @@
+version: "3.9"
+
+networks:
+    postnetwork:
+        name: postnetwork
+
+services:
+    postdb:
+        image: postgres
+        restart: always
+        environment:
+            POSTGRES_DB: postdb
+            POSTGRES_USER: admin
+            POSTGRES_PASSWORD: admin
+        networks:
+            - postnetwork
+        volumes:
+            - "pgdata:/var/lib/postgresql/data"
+            
+    nginx:
+        image: vladkb1/nginx
+        restart: always
+        networks:
+            - postnetwork
+        ports:
+            - "5000:1409"
+
+    post_bot:
+        environment:
+            BOT_TOKEN: "1847977944:AAGw_tfQwOCV6NlK2rzT17YGKwHHE6AN-Xo"
+            WEBHOOK_URL: "https://9130c761e346.ngrok.io"
+        image: vladkb1/post_bot
+        restart: always
+        networks:
+            - postnetwork
+        depends_on:
+            - postdb
+volumes:
+        pgdata:
+

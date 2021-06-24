@@ -325,4 +325,4 @@ def buttons_processing():
     # elif rdata == "sent_messages":
     #    edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
 
-flask_app.run()
+flask_app.run(host="0.0.0.0")

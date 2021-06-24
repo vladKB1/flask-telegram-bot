@@ -1,7 +1,7 @@
 import os
 
 class Config(object):
-    SQLALCHEMY_DATABASE_URI = "postgresql://db_user:123@localhost:5432/db_flask_telegram_bot"
+    SQLALCHEMY_DATABASE_URI = "postgresql://admin:admin@postdb:5432/postdb"
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
 
