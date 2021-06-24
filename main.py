@@ -69,76 +69,89 @@ def receive():
         buttons_processing()
         return ""
 
-    user_id = int(request.json["message"]["from"]["id"])
-    username = request.json["message"]["from"]["username"]
-    user = User.query.get(user_id)
+    if "message" in request.json:
+        user_id = int(request.json["message"]["from"]["id"])
+        username = request.json["message"]["from"]["username"]
+        user = User.query.get(user_id)
 
-    if "text" in request.json["message"]:
-        text = request.json["message"]["text"]
+        if "text" in request.json["message"]:
+            text = request.json["message"]["text"]
 
-        if text == "/start":
-            if user is None:
-                user = User(id=user_id, username=username)
-                db.session.add(user)
-                db.session.commit()
-
-            user.state = "/start"
-            db.session.commit()
-            send_message(START_MSG, user_id, json.dumps(START_MENU))
-            return ""
-
-
-        if user.state == "search":
-            if check_search(text):
-                user.state_data = text
-                db.session.commit()
-
-                if not check_favorite(user_id, text):
-                    user.state = "after_search_not_favorites"
+            if text == "/start":
+                if user is None:
+                    user = User(id=user_id, username=username)
+                    db.session.add(user)
                     db.session.commit()
-                    send_message(AFTER_SEARCH_NOT_FAVORITES_MSG, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
+
+                user.state = "/start"
+                db.session.commit()
+                send_message(START_MSG, user_id, json.dumps(START_MENU))
+                return ""
+
+
+            if user.state == "search":
+                if check_search(text):
+                    user.state_data = text
+                    db.session.commit()
+
+                    if not check_favorite(user_id, text):
+                        user.state = "after_search_not_favorites"
+                        db.session.commit()
+                        send_message(AFTER_SEARCH_NOT_FAVORITES_MSG, user_id, json.dumps(AFTER_SEARCH_NOT_FAVORITES_MENU))
+                    else:
+                        user.state = "after_search_send_message_2"
+                        db.session.commit()
+                        send_message(AFTER_SEARCH_SEND_MESSAGE_MSG, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
                 else:
-                    user.state = "after_search_send_message_2"
-                    db.session.commit()
-                    send_message(AFTER_SEARCH_SEND_MESSAGE_MSG, user_id, json.dumps(AFTER_SEARCH_SEND_MESSAGE_MENU))
-            else:
-                send_short_msg(SEARCH_FAILED_MSG, user_id)
-                send_message(SEARCH_MSG, user_id, json.dumps(SEARCH_MENU))
+                    send_short_msg(SEARCH_FAILED_MSG, user_id)
+                    send_message(SEARCH_MSG, user_id, json.dumps(SEARCH_MENU))
 
-        elif user.state.find("after_search_send_message") != -1:
-            send_post_to_channel(user_id, get_channel_id(user.state_data), text)
-            send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
+            elif user.state.find("after_search_send_message") != -1:
+                send_post_to_channel(user_id, get_channel_id(user.state_data), text)
+                send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
 
-        elif user.state == "connect_channel":
-            channel = Channel.query.filter(Channel.name == text).first()
-            
-            if channel is None:
-                get_chat(text)
-                response = json.loads(get_chat(text).content)
+            elif user.state == "connect_channel":
+                channel = Channel.query.filter(Channel.name == text).first()
 
-                if response["ok"]:
-                    channel_id = response["result"]["id"]
-                    name = response["result"]["username"]
+                if channel is None:
+                    get_chat(text)
+                    response = json.loads(get_chat(text).content)
 
-                    response = json.loads(get_chat_admin(channel_id).content)
                     if response["ok"]:
-                        for member in response["result"]:
-                            if member["status"] == "creator":
-                                admin_user = int(member["user"]["id"])
-                                break
+                        channel_id = response["result"]["id"]
+                        name = response["result"]["username"]
 
-                        if admin_user == user_id:
-                            # add check on if bot can make change
-                            channel = Channel(channel_id=channel_id, name="@"+name, admin_user=admin_user)
-                            db.session.add(channel)
-                            db.session.commit()
+                        response = json.loads(get_chat_admin(channel_id).content)
+                        if response["ok"]:
+                            for member in response["result"]:
+                                if member["status"] == "creator":
+                                    admin_user = int(member["user"]["id"])
+                                    break
 
-            #delete_message()
-            user.state = "my_channels"
-            menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy())
-            send_message(MY_CHANNELS_MSG, user_id, json.dumps(menu))
+                            if admin_user == user_id:
+                                # add check on if bot can make change
+                                channel = Channel(channel_id=channel_id, name="@"+name, admin_user=admin_user)
+                                db.session.add(channel)
+                                db.session.commit()
 
+                user.state = "my_channels"
+                menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy(), "channel_for_looking_through_posts|")
+                send_message(MY_CHANNELS_MSG, user_id, json.dumps(menu))
+
+        return ""
     return ""
+
+def check_my_channels():
+    users = User.query.filter().all()
+
+    for user in users:
+        channels = Channel.query.filter(Channel.admin_user == user.id).all()
+        for channel in channels:
+            response = json.loads(get_chat_admin(channel.channel_id).content)
+            if not response["ok"]:
+                Channel.query.filter(Channel.channel_id == channel.channel_id).delete()
+                db.session.commit()
+
 
 
 def get_username(user_id):
@@ -285,6 +298,7 @@ def buttons_processing():
 
     # press my_channels
     elif rdata == "my_channels":
+        check_my_channels()
         menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy(), "channel_for_looking_through_posts|")
         edit_message(MY_CHANNELS_MSG, message_id, user_id, json.dumps(menu))
     # press connect_channel
