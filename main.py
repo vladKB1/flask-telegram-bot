@@ -28,6 +28,13 @@ def send_message(message, user_id, reply_markup):
     requests.post(url, data=data)
 
 
+def edit_message_short(message, message_id, user_id):
+    method = "editMessageText"
+    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
+    data = {"chat_id": user_id, "message_id": message_id, "text": message}
+    requests.post(url, data=data)
+
+
 def edit_message(message, message_id, user_id, reply_markup):
     method = "editMessageText"
     url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
@@ -35,7 +42,11 @@ def edit_message(message, message_id, user_id, reply_markup):
     requests.post(url, data=data)
 
 
-#def delete_message():
+def delete_message(chat_id, message_id):
+    method = "deleteMessage"
+    url = f"{TELEGRAM_URL}/bot{BOT_TOKEN}/{method}"
+    data = {"chat_id": chat_id, "message_id": message_id}
+    requests.post(url, data=data)
 
 
 def get_chat(chat_id):
@@ -95,7 +106,6 @@ def receive():
                 send_message(SEARCH_MSG, user_id, json.dumps(SEARCH_MENU))
 
         elif user.state.find("after_search_send_message") != -1:
-            # only text messages. Need to upgrade for all types of content.
             send_post_to_channel(user_id, get_channel_id(user.state_data), text)
             send_message(MESSAGE_SENT_MSG, user_id, json.dumps(MESSAGE_SENT_MENU))
 
@@ -131,10 +141,16 @@ def receive():
     return ""
 
 
+def get_username(user_id):
+    return User.query.get(user_id).username
+
 def get_channel_id(channel_name):
     return Channel.query.filter(Channel.name == channel_name).first().channel_id
 def get_channel_name(channel_id):
     return Channel.query.filter(Channel.channel_id == channel_id).first().name
+
+def get_posts(channel_id):
+    return Post.query.filter(Post.channel_id == channel_id).all()
 
 
 def add_favorites(user_id, channel_name):
@@ -168,8 +184,6 @@ def check_favorite(user_id, channel_id):
         return True
 
 
-
-
 def send_post_to_channel(user_id, channel_id, text):
     post = Post(user_id=user_id, channel_id=channel_id, text=text)
     db.session.add(post)
@@ -185,12 +199,17 @@ def update_favorites_menu(user_id, menu, callback_text):
     return {"inline_keyboard": menu}
 
 
-def update_channels_menu(user_id, menu):
+def update_channels_menu(user_id, menu, callback_text):
     channels = Channel.query.filter(Channel.admin_user == user_id).all()
     for channel in channels:
-        menu.append([{"text": channel.name, "callback_data": "channel_chose|" + channel.channel_id}])
+        menu.append([{"text": channel.name, "callback_data": callback_text + channel.channel_id}])
     return {"inline_keyboard": menu}
 
+
+def get_post_menu(post_id):
+    menu = [[{"text": "✅ Опубликовать", "callback_data": "publish_post|" + str(post_id)},
+             {"text": "❌ Удалить", "callback_data": "delete_post|" + str(post_id)}]]
+    return {"inline_keyboard": menu}
 
 
 def buttons_processing():
@@ -205,8 +224,23 @@ def buttons_processing():
     elif rdata == "one_more_post" or rdata == "return_to_start":
         rdata = RETURN_BACK[rdata]
 
+    if rdata.find("publish_post") != -1:
+        post_id = rdata.split("|")[1]
+        post = Post.query.get(post_id)
+        send_short_msg(post.text, post.channel_id)
+        Post.query.filter(Post.id == post_id).delete()
+        db.session.commit()
+        delete_message(user_id, message_id)
+        return ""
+    elif rdata.find("delete_post") != -1:
+        Post.query.filter(Post.id == rdata.split("|")[1]).delete()
+        db.session.commit()
+        delete_message(user_id, message_id)
+        return ""
+
     user.state = rdata
     db.session.commit()
+
 
     if rdata == "/start":
         edit_message(START_MSG, message_id, user_id, json.dumps(START_MENU))
@@ -249,14 +283,30 @@ def buttons_processing():
         menu = update_favorites_menu(user_id, MY_FAVORITES_MENU.copy(), "channel_chose|")
         edit_message(AFTER_DELETE_CHANNEL_FROM_FAVORITES_MSG, message_id, user_id, json.dumps(menu))
 
-
     # press my_channels
     elif rdata == "my_channels":
-        menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy())
+        menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy(), "channel_for_looking_through_posts|")
         edit_message(MY_CHANNELS_MSG, message_id, user_id, json.dumps(menu))
     # press connect_channel
     elif rdata == "connect_channel":
         edit_message(CONNECT_CHANNEL_MSG, message_id, user_id, json.dumps(CONNECT_CHANNEL_MENU))
+    # channel_for_looking_through_posts
+    elif rdata.find("channel_for_looking_through_posts") != -1:
+        channel_id = rdata.split("|")[1]
+        posts = get_posts(channel_id)
+        user.state = "channel_for_looking_through_posts"
+        db.session.commit()
+
+        k = 0
+        for post in posts:
+            k += 1
+            msg = f"Author: @{get_username(post.user_id)}\n\n" + post.text
+            menu = get_post_menu(post.id)
+            send_message(msg, user_id, json.dumps(menu))
+
+        msg = f"У вас {k} предложенных постов без ответа."
+        menu = {"inline_keyboard": [[{"text": "<< Назад", "callback_data": "back"}]]}
+        send_message(msg, user_id, json.dumps(menu))
 
     # elif rdata == "sent_messages":
     #    edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
