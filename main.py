@@ -29,7 +29,7 @@ def receive():
 
             if "text" in request.json["message"]:
                 text = request.json["message"]["text"]
-                print(text)
+                log(text)
 
                 if text == "/start":
                     if user is None:
@@ -112,10 +112,24 @@ def receive():
                     menu = update_channels_menu(user_id, MY_CHANNELS_MENU.copy(), "channel_for_looking_through_posts|")
                     send_message(MY_CHANNELS_MSG, user_id, json.dumps(menu))
 
+                elif user.state == "waiting_edit_msg":
+                    post = Post.query.filter(Post.id == int(user.state_data)).first()
+                    post.text = text
+                    db.session.commit()
+
+                    user.state = "/start"
+                    user.state_data = ""
+                    db.session.commit()
+                    send_message(START_MSG, user_id, json.dumps(START_MENU))
+
             return ""
         return ""
     except:
         return "BAD"
+
+
+def log(message):
+    print(message)
 
 
 def delete_buttons(user_id, state_data):
@@ -185,7 +199,7 @@ def send_post_to_channel(user_id, channel_id, text):
     db.session.commit()
 
 
-# update menus
+# update/get menus
 def update_favorites_menu(user_id, menu, callback_text):
     channels = UserFavoritesRelation.query.filter(UserFavoritesRelation.user_id == user_id).all()
     for channel in channels:
@@ -207,6 +221,12 @@ def get_post_menu(post_id):
     return {"inline_keyboard": menu}
 
 
+def get_user_post_menu(post_id):
+    menu = [[{"text": "Изменить", "callback_data": "edit_post|" + str(post_id)},
+             {"text": "❌ Удалить", "callback_data": "delete_post|" + str(post_id)}]]
+    return {"inline_keyboard": menu}
+
+
 def buttons_processing(rdata):
     user_id = int(request.json["callback_query"]["from"]["id"])
     username = request.json["callback_query"]["from"]["username"]
@@ -218,6 +238,11 @@ def buttons_processing(rdata):
             messages = user.state_data.split("|")
             for msg_id in messages:
                 delete_message(user_id, msg_id)
+        elif user.state == "sent_messages":
+            messages = user.state_data.split("|")
+            for i in range(len(messages) - 2):
+                msg_id = messages[i]
+                delete_message(user_id, int(msg_id))
 
         rdata = RETURN_BACK[user.state]
     elif rdata == "one_more_post" or rdata == "return_to_start":
@@ -236,6 +261,22 @@ def buttons_processing(rdata):
         db.session.commit()
         delete_message(user_id, message_id)
         return ""
+    elif rdata.find("edit_post") != -1:
+        post = Post.query.filter(Post.id == rdata.split("|")[1]).first()
+
+        messages = user.state_data.split("|")
+        for msg_id in messages:
+            delete_message(user_id, msg_id)
+
+        msg = f"Channel: @{get_channel_name(post.channel_id)}\n\n" + post.text  \
+              + "\n\n Пришлите исправленное сообщение: "
+        send_short_msg(msg, user_id)
+
+        user.state = "waiting_edit_msg"
+        user.state_data = str(post.id)
+        db.session.commit()
+        return ""
+
 
     user.state = rdata
     db.session.commit()
@@ -331,8 +372,28 @@ def buttons_processing(rdata):
         menu = {"inline_keyboard": [[{"text": "<< Назад", "callback_data": "back"}]]}
         send_message(msg, user_id, json.dumps(menu))
 
-    # elif rdata == "sent_messages":
-    #    edit_message(SENT_MSGS_MSG, message_id, user_id, json.dumps(SENT_MSGS_MENU))
+    elif rdata == "sent_messages":
+        delete_message(user_id, message_id)
+
+        user.state_data = ""
+        db.session.commit()
+
+        for post in user.posts:
+            msg = f"Channel: @{get_channel_name(post.channel_id)}\n\n" + post.text
+            menu = get_user_post_menu(post.id)
+            response = send_message(msg, user_id, json.dumps(menu))
+
+            response = json.loads(response.content)
+            user.state_data += str(response["result"]["message_id"]) + "|"
+            db.session.commit()
+
+        msg = f"У вас {len(user.posts)} необработанных сообщений:"
+        menu = {"inline_keyboard": [[{"text": "<< Назад", "callback_data": "back"}]]}
+        response = send_message(msg, user_id, json.dumps(menu))
+
+        response = json.loads(response.content)
+        user.state_data += str(response["result"]["message_id"]) + "|"
+        db.session.commit()
 
 
 flask_app.run()
