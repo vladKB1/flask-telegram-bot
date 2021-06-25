@@ -4,8 +4,8 @@ import json
 START_MSG = "Это стартовое меню!\n"
 START_MENU = {"inline_keyboard": [
     [{"text": "Предложить пост", "callback_data": "suggest_post"},
-     {"text": "Мои каналы", "callback_data": "my_channels"}]]}
-   # [{"text": "Отправленные сообщения", "callback_data": "sent_messages"}]]}
+     {"text": "Мои каналы", "callback_data": "my_channels"}],
+    [{"text": "Отправленные сообщения", "callback_data": "sent_messages"}]]}
 
 # suggest_post
 SUGGEST_POST_MSG = "Чтобы предложить пост - найдите канал с помощью поиска, " \
@@ -76,17 +76,6 @@ CONNECT_CHANNEL_MENU = {"inline_keyboard": [
 
 
 
-# # sent_messages
-# SENT_MSGS_MSG = "Выберите кол-во последних сообщений для просмотра:"
-# SENT_MSGS_MENU = {"inline_keyboard": [
-#     [{"text": "5", "callback_data": "sent_messages_looking|5"},
-#      {"text": "10", "callback_data": "sent_messages_looking|10"},
-#      {"text": "20", "callback_data": "sent_messages_looking|20"}],
-#     [{"text": "Все сообщения", "callback_data": "sent_messages_looking|all"}],
-#     [{"text": "<< Назад", "callback_data": "back"}]]}
-
-
-
 RETURN_BACK = {
     "suggest_post": "/start", "my_channels": "/start", "sent_messages": "/start",
 
@@ -103,5 +92,4 @@ RETURN_BACK = {
 
 
     "connect_channel": "my_channels",  "channel_for_looking_through_posts": "my_channels"
-
 }
