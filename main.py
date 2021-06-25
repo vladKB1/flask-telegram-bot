@@ -1,5 +1,7 @@
 import requests
 import json
+from time import sleep
+import threading
 
 from app.models import *
 from app import flask_app
@@ -395,6 +397,23 @@ def buttons_processing(rdata):
         user.state_data += str(response["result"]["message_id"]) + "|"
         db.session.commit()
 
+
+def async_check_channels():
+    while(True):
+        sleep(120)
+
+        users = User.query.all()
+        for user in users:
+            channels = Channel.query.filter(Channel.admin_user == user.id).all()
+            for channel in channels:
+                response = json.loads(get_chat_admin(channel.id).content)
+                if not response["ok"]:
+                    Channel.query.filter(Channel.id == channel.id).delete()
+                    db.session.commit()
+
+
+async_method = threading.Thread(target=async_check_channels)
+async_method.start()
 
 flask_app.run()
 # flask_app.run(host="0.0.0.0")
